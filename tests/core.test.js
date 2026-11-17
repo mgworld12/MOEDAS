@@ -27,4 +27,10 @@ const ps=positions(ops);assert.equal(ps.length,1);near(ps[0].qtd,150);near(ps[0]
 const sp=PROFILES.remessa,inp={qtd:100,total:560,taxas:20},pj=sellProjection(sp,inp);
 near(pj.paid,5.4);near(pj.result(pj.be),0,1e-6);near(pj.result(pj.priceFor(50)),50,1e-6);near(pj.result(pj.priceFor(56)),56,1e-6);
 const nU=pj.unitsFor(7,50);near(nU*(7*pj.k-pj.avg)-sp.fixed,50,1e-6);assert.equal(pj.unitsFor(1,50),null);
+import {FIGURAS,template} from '../assets/js/catalog.js';import {parseOp} from '../assets/js/portfolio.js';
+assert.ok(FIGURAS.length>=24&&FIGURAS.every(f=>f.nome&&f.ctx&&(f.c||f.pts.length>3)));
+const tp=template(FIGURAS[0],ser,30);assert.equal(tp.pts.length,FIGURAS[0].pts.length);assert.ok(tp.pts.every(q=>ser.some(b=>b.t===q.t)));
+const po=parseOp('Compra de 100 USD em 15/11/2026\nCotação: 5,40\nTaxas: R$ 12,50\nIOF: R$ 7,50\nTotal pago: R$ 560,00',['USD','EUR']);
+assert.deepEqual([po.moeda,po.tipo,po.qtd,po.total,po.taxas,po.cotacao,po.date],['USD','compra',100,560,20,5.4,'2026-11-15']);
+const pv=parseOp('Venda EUR 1.250,50 total recebido R$ 7.800,00',['USD','EUR']);assert.deepEqual([pv.tipo,pv.moeda,pv.qtd,pv.total],['venda','EUR',1250.5,7800]);
 console.log('Todos os testes passaram.');
