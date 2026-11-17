@@ -1,0 +1,20 @@
+:root{--bg:#0f141b;--panel:#171e28;--line:#27323f;--tx:#e8edf3;--mut:#93a1b2;--up:#3ecf9e;--dn:#ff6b6b;--warn:#f0b429;--ac:#6cb2ff;color-scheme:dark}
+[data-theme=light]{--bg:#f5f7fa;--panel:#fff;--line:#d9e0e8;--tx:#16202b;--mut:#5b6b7c;--up:#0f8a62;--dn:#c93a3a;--warn:#9a6b00;--ac:#1f6fc5;color-scheme:light}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 "IBM Plex Sans",system-ui,sans-serif;font-variant-numeric:tabular-nums}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:12px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:5}
+.brand{font-size:17px;margin-right:auto}nav{display:flex;gap:4px;flex-wrap:wrap}
+button,select,input{font:inherit;color:var(--tx);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:7px 11px}
+button{cursor:pointer}nav button[aria-current=true],.seg button[aria-pressed=true]{border-color:var(--ac);color:var(--ac)}
+:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+main{max-width:1080px;margin:0 auto;padding:20px}h2{margin:0 0 14px;font-size:21px}h3{margin:22px 0 8px;font-size:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.card{text-align:left;padding:14px;display:flex;flex-direction:column;gap:4px}.card b{font-size:15px}.card .v{font-size:22px;font-weight:600}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin-bottom:14px}label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--mut)}
+.seg{display:flex;gap:4px}.up{color:var(--up)}.dn{color:var(--dn)}.mut{color:var(--mut)}.warn{color:var(--warn)}
+#chart{position:relative;height:420px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}th{color:var(--mut);font-weight:500}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;margin-top:12px}
+.big{font-size:26px;font-weight:600}.note{font-size:13px;color:var(--mut);margin:8px 0}
+footer{max-width:1080px;margin:0 auto;padding:16px 20px 40px;font-size:12px;color:var(--mut)}
+@media(max-width:600px){main{padding:14px}th,td{padding:6px 4px;font-size:13px}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
