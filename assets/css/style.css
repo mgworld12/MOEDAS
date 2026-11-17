@@ -11,10 +11,12 @@ main{max-width:1080px;margin:0 auto;padding:20px}h2{margin:0 0 14px;font-size:21
 .card{text-align:left;padding:14px;display:flex;flex-direction:column;gap:4px}.card b{font-size:15px}.card .v{font-size:22px;font-weight:600}
 .row{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin-bottom:14px}label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--mut)}
 .seg{display:flex;gap:4px}.up{color:var(--up)}.dn{color:var(--dn)}.mut{color:var(--mut)}.warn{color:var(--warn)}
-#chart{position:relative;height:420px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+#chart{position:relative;height:clamp(440px,68vh,780px);border:1px solid var(--line);border-radius:8px;background:var(--panel)}
 table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}th{color:var(--mut);font-weight:500}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;margin-top:12px}
 .big{font-size:26px;font-weight:600}.note{font-size:13px;color:var(--mut);margin:8px 0}
 footer{max-width:1080px;margin:0 auto;padding:16px 20px 40px;font-size:12px;color:var(--mut)}
 @media(max-width:600px){main{padding:14px}th,td{padding:6px 4px;font-size:13px}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+.bd{display:inline-grid;place-items:center;min-width:24px;height:24px;padding:0 4px;border-radius:12px;font-size:11px;font-weight:600;color:#fff;margin-right:4px;vertical-align:middle}
+#theme{padding:6px 8px;line-height:0}[data-theme=dark] .i-moon,[data-theme=light] .i-sun{display:none}
