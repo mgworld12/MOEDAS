@@ -20,3 +20,4 @@ footer{max-width:1080px;margin:0 auto;padding:16px 20px 40px;font-size:12px;colo
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 .bd{display:inline-grid;place-items:center;min-width:24px;height:24px;padding:0 4px;border-radius:12px;font-size:11px;font-weight:600;color:#fff;margin-right:4px;vertical-align:middle}
 #theme{padding:6px 8px;line-height:0}[data-theme=dark] .i-moon,[data-theme=light] .i-sun{display:none}
+#toast{position:fixed;top:12px;right:12px;z-index:20;display:flex;flex-direction:column;gap:8px;max-width:360px}#toast div{background:var(--panel);border:1px solid var(--warn);border-radius:8px;padding:10px 12px;display:flex;gap:10px;align-items:center}
