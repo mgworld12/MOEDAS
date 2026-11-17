@@ -33,4 +33,16 @@ const tp=template(FIGURAS[0],ser,30);assert.equal(tp.pts.length,FIGURAS[0].pts.l
 const po=parseOp('Compra de 100 USD em 15/11/2026\nCotação: 5,40\nTaxas: R$ 12,50\nIOF: R$ 7,50\nTotal pago: R$ 560,00',['USD','EUR']);
 assert.deepEqual([po.moeda,po.tipo,po.qtd,po.total,po.taxas,po.cotacao,po.date],['USD','compra',100,560,20,5.4,'2026-11-15']);
 const pv=parseOp('Venda EUR 1.250,50 total recebido R$ 7.800,00',['USD','EUR']);assert.deepEqual([pv.tipo,pv.moeda,pv.qtd,pv.total],['venda','EUR',1250.5,7800]);
+import {makeBackup,parseBackup,hits,clean} from '../assets/js/backup.js';
+const line=(k)=>Array.from({length:101},(_,i)=>{const j=k.findIndex(z=>z[0]>=i),[x1,y1]=k[Math.max(j-1,0)],[x2,y2]=k[j],c=x1===x2?y2:y1+(y2-y1)*(i-x1)/(x2-x1);return{t:'d'+String(i).padStart(3,'0'),o:c,h:c+.001,l:c-.001,c}});
+const tri=line([[0,7],[10,10],[20,7.6],[30,10],[40,8.2],[50,10],[60,8.8],[70,10],[80,9.4],[100,11]]);
+const ta=detect(tri,false).find(p=>p.nome==='Triângulo ascendente');assert.ok(ta&&ta.estado==='Confirmada'&&ta.dir==='alta');
+const ta2=detect(tri.slice(0,86),false).find(p=>p.nome==='Triângulo ascendente');assert.ok(ta2&&ta2.estado==='Confirmação pendente','sem olhar o futuro');
+const ch=line([[0,5.5],[10,11],[20,6],[30,12],[40,7],[50,13],[60,8],[70,14],[80,9],[90,15],[100,10]].map(([x,y])=>[x,y*0.5+x*0.025]));
+const cn=detect(ch,false).find(p=>p.nome==='Canal de alta');assert.ok(cn&&cn.estado==='Identificada');
+assert.ok(!detect(line([[0,5],[100,6]]),false).some(p=>/Tri|Canal/.test(p.nome)),'reta não é padrão');
+const S0={ops,profiles:PROFILES,alerts:[{id:1,moeda:'USD',alvo:6,descr:'<b>x</b>',ativo:true}],fig:{},profile:'especie',theme:'dark'};
+const bk=parseBackup(makeBackup(S0));assert.equal(bk.dados.ops.length,4);assert.equal(bk.dados.alerts[0].descr,'bx/b');assert.ok(!bk.dados.alerts[0].descr.includes('<'));
+assert.ok(parseBackup('{').erro&&parseBackup('{"app":"x"}').erro&&parseBackup(JSON.stringify({app:'investimento-em-moedas',ops:[{id:1,tipo:'compra',moeda:'USD',date:'2026-01-01',qtd:1,total:5,taxas:9}]})).erro);
+assert.equal(hits(S0.alerts,'USD',6.01).length,1);assert.equal(hits(S0.alerts,'USD',5.9).length,0);assert.equal(hits(S0.alerts,'EUR',9).length,0);
 console.log('Todos os testes passaram.');
