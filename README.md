@@ -10,6 +10,7 @@ PWA estático (HTML/CSS/JS, módulos ES) para analisar tendências de pares de m
 - **Padrões gráficos:** topo/fundo duplo, ombro-cabeça-ombro (e invertido), doji, martelo, estrela cadente e engolfos, com estados, critérios, qualidade e identificação sem olhar o futuro. As figuras ficam numa camada própria: arraste, ajuste transparência e espessura, oculte uma a uma ou todas, e restaure as posições.
 - **Carteira:** operações reais e simuladas (separadas), preço médio com taxas, lucro realizado e não realizado, e **projeção de venda** (empate, resultado num preço alvo, preço para o lucro desejado e quantidade a vender).
 - **Figuras:** página com 24 figuras do Forex (esquema, contexto e direção); “Ver no gráfico” as mostra sobre o gráfico. **Colar dados** preenche carteira e análise a partir de texto copiado. O gráfico abre sempre limpo.
+- **Backup JSON** (exportar/importar com validação), **alertas de preço de venda** (conferidos a cada 5 min com o app aberto) e detecção automática de **triângulos** e **canais**.
 - Tema escuro/claro/sistema, dados em IndexedDB, cache e aviso de dado desatualizado, instalável como PWA.
 
 ## Fontes
@@ -18,7 +19,7 @@ PWA estático (HTML/CSS/JS, módulos ES) para analisar tendências de pares de m
 - Wise: **não integrada** (exige token privado). `sources.js` tem o ponto de extensão; ligue-a por um serviço intermediário (ex.: Cloudflare Worker) sem expor a chave.
 
 ## Ainda não implementado
-Triângulos, canais, bandeiras, cunhas, topo/fundo triplo, redimensionar figuras, desenhos manuais, radar, alertas, parcelas, venda com troca para outra moeda, Wise, backtesting, relatórios CSV/Excel/PDF e backup. Taxas e IOF padrão são **exemplos**.
+Bandeiras, cunhas, topo/fundo triplo, redimensionar figuras, desenhos manuais, radar, alertas, parcelas, venda com troca para outra moeda, Wise, backtesting, relatórios CSV/Excel/PDF e backup. Taxas e IOF padrão são **exemplos**.
 
 ## Executar e testar
 ```
