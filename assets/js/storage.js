@@ -1,0 +1,3 @@
+const open=()=>new Promise((res,rej)=>{const r=indexedDB.open('moedas',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
+export async function kvGet(k){try{const db=await open();return await new Promise(r=>{const q=db.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>r(q.result);q.onerror=()=>r(undefined)})}catch{return undefined}}
+export async function kvSet(k,v){try{const db=await open();await new Promise(r=>{const t=db.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=()=>r();t.onerror=()=>r()})}catch{}}
