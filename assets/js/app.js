@@ -1,19 +1,20 @@
-import {CURRENCIES,FAVORITES,PERIODS} from './config.js';
+import {CURRENCIES,FAVORITES,PERIODS,SYM,badge} from './config.js';
 import {kvGet,kvSet} from './storage.js';
 import {getSeries,wiseAdapter} from './sources.js';
 import {analyze} from './analysis.js';
 import {PROFILES,roundTrip,convertNet} from './costs.js';
 import {sma,ema,bollinger} from './indicators.js';
 import {detect} from './patterns.js';
-import {positions,sellProjection} from './portfolio.js';
+import {FIGURAS,svg,template} from './catalog.js';
+import {positions,sellProjection,parseOp} from './portfolio.js';
 
 const $=(s,r=document)=>r.querySelector(s), last=a=>a[a.length-1];
 const nf=(n,d=4)=>Number.isFinite(n)?n.toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d}):'—';
 const pct=n=>Number.isFinite(n)?(n>0?'+':'')+n.toLocaleString('pt-BR',{maximumFractionDigits:2})+'%':'—';
 const cls=n=>n>0?'up':n<0?'dn':'';
-const cur=(sel)=>Object.entries(CURRENCIES).map(([k,v])=>`<option value="${k}"${k===sel?' selected':''}>${k} — ${v}</option>`).join('');
+const cur=(sel)=>Object.entries(CURRENCIES).map(([k,v])=>`<option value="${k}"${k===sel?' selected':''}>${SYM[k]} ${k} — ${v}</option>`).join('');
 const when=t=>new Date(t).toLocaleString('pt-BR');
-let S={view:'inicio',base:'USD',quote:'BRL',days:180,profile:'especie',amount:10000,theme:'dark',cf:'BRL',ct:'USD',ind:{sma20:true,sma50:true,ema:false,bb:false},ops:[],fig:{},fo:.9,fw:2,figAll:false,pat:true,profiles:structuredClone(PROFILES)};
+let S={view:'inicio',base:'USD',quote:'BRL',days:180,profile:'especie',amount:10000,theme:'dark',cf:'BRL',ct:'USD',ind:{sma20:false,sma50:false,ema:false,bb:false},ops:[],fig:{},fo:.6,fw:2,figAll:false,pat:false,sel:null,tw:45,profiles:structuredClone(PROFILES)};
 const save=()=>kvSet('state',S);
 const prof=()=>S.profiles[S.profile];
 
@@ -23,20 +24,20 @@ const srcNote=r=>`<p class="note">Fonte: ${r.source}. Último dado: ${last(r.poi
 
 function render(){
   document.querySelectorAll('#nav button').forEach(b=>b.setAttribute('aria-current',b.dataset.v===S.view));
-  const m=$('#main');({inicio:viewInicio,conversor:viewConv,analise:viewAnalise,carteira:viewCarteira,custos:viewCustos})[S.view](m);
+  const m=$('#main');({inicio:viewInicio,conversor:viewConv,analise:viewAnalise,figuras:viewFiguras,carteira:viewCarteira,custos:viewCustos})[S.view](m);
 }
 const go=v=>{S.view=v;save();render()};
 
 async function viewInicio(m){
   m.innerHTML='<h2>Pares acompanhados</h2><div class="grid" id="cards"></div><p class="note">Toque em um par para abrir a análise. Variações calculadas sobre cotações de referência diárias.</p>';
   for(const [b,q] of FAVORITES){
-    const c=document.createElement('button');c.className='card';c.innerHTML=`<b>${b}/${q}</b><span class="mut">carregando…</span>`;$('#cards').append(c);
+    const c=document.createElement('button');c.className='card';c.innerHTML=`<b>${badge(b)}${badge(q)}${b}/${q}</b><span class="mut">carregando…</span>`;$('#cards').append(c);
     c.onclick=()=>{S.base=b;S.quote=q;go('analise')};
     getSeries(b,q,40).then(r=>{
       const cl=r.points.map(p=>p.c),n=cl.length,x=last(cl),v1=(x/cl[n-2]-1)*100,v5=(x/cl[Math.max(0,n-6)]-1)*100,v30=(x/cl[0]-1)*100;
       const mn=Math.min(...cl),mx=Math.max(...cl),pts=cl.map((y,i)=>`${(i/(n-1)*100).toFixed(1)},${(28-(y-mn)/(mx-mn||1)*26).toFixed(1)}`).join(' ');
-      c.innerHTML=`<b>${b}/${q}</b><span class="v">${nf(x,x<1?5:4)}</span><svg viewBox="0 0 100 30" width="100%" height="30" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="1.5" class="${cls(v30)}"/></svg><span class="mut">dia <b class="${cls(v1)}">${pct(v1)}</b> · 5 pregões <b class="${cls(v5)}">${pct(v5)}</b> · período <b class="${cls(v30)}">${pct(v30)}</b></span><span class="note">${r.stale?'desatualizado · ':''}${last(r.points).t}</span>`;
-    }).catch(()=>{c.innerHTML=`<b>${b}/${q}</b><span class="warn">indisponível</span>`});
+      c.innerHTML=`<b>${badge(b)}${badge(q)}${b}/${q}</b><span class="v">${nf(x,x<1?5:4)}</span><svg viewBox="0 0 100 30" width="100%" height="30" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="1.5" class="${cls(v30)}"/></svg><span class="mut">dia <b class="${cls(v1)}">${pct(v1)}</b> · 5 pregões <b class="${cls(v5)}">${pct(v5)}</b> · período <b class="${cls(v30)}">${pct(v30)}</b></span><span class="note">${r.stale?'desatualizado · ':''}${last(r.points).t}</span>`;
+    }).catch(()=>{c.innerHTML=`<b>${badge(b)}${badge(q)}${b}/${q}</b><span class="warn">indisponível</span>`});
   }
 }
 
@@ -73,19 +74,23 @@ function chart(el,r,show){
 }
 
 async function viewAnalise(m){
-  m.innerHTML=`<h2>Análise de tendência e vantagem líquida</h2><div class="row">
+  m.innerHTML=`<h2 id="ttl">Análise de tendência e vantagem líquida</h2><div class="row"><button id="colar">Colar dados da operação</button>
   <label>Moeda<select id="b">${cur(S.base)}</select></label><label>Contra<select id="q">${cur(S.quote)}</select></label>
   <div class="seg" role="group" aria-label="Período">${PERIODS.map(([d,l])=>`<button data-d="${d}" aria-pressed="${d===S.days}">${l}</button>`).join('')}</div>
   <label>Perfil de custos<select id="p">${Object.entries(S.profiles).map(([k,p])=>`<option value="${k}"${k===S.profile?' selected':''}>${p.nome}</option>`).join('')}</select></label>
   <label>Valor da operação<input id="a" type="number" min="1" value="${S.amount}"></label></div>
   <div class="row">${[['sma20','SMA 20'],['sma50','SMA 50'],['ema','EMA 12'],['bb','Bollinger']].map(([k,l])=>`<label style="flex-direction:row;gap:6px"><input type="checkbox" data-i="${k}" ${S.ind[k]?'checked':''}>${l}</label>`).join('')}</div>
-  <div class="row"><label style="flex-direction:row;gap:6px"><input type="checkbox" data-p="pat" ${S.pat?'checked':''}>Padrões</label><label style="flex-direction:row;gap:6px"><input type="checkbox" data-p="figAll" ${S.figAll?'checked':''}>Ocultar todas as figuras</label><label>Transparência<input type="range" data-p="fo" min=".15" max="1" step=".05" value="${S.fo}"></label><label>Espessura<input type="range" data-p="fw" min="1" max="5" step="1" value="${S.fw}"></label><button id="rst">Restaurar posições</button></div>
+  <div class="row"><label style="flex-direction:row;gap:6px"><input type="checkbox" data-p="pat" ${S.pat?'checked':''}>Figuras detectadas automaticamente</label><label style="flex-direction:row;gap:6px"><input type="checkbox" data-p="figAll" ${S.figAll?'checked':''}>Ocultar todas as figuras</label><label>Transparência<input type="range" data-p="fo" min=".05" max="1" step=".05" value="${S.fo}"></label><label>Espessura<input type="range" data-p="fw" min="1" max="5" step="1" value="${S.fw}"></label><button id="rst">Restaurar posições</button>${S.sel?`<span>Figura: <b>${S.sel}</b> <button id="selx">Remover</button></span><label>Tamanho do modelo (barras)<input type="range" data-p="tw" min="15" max="150" step="5" value="${S.tw}"></label>`:''}</div>
   <div id="chart" role="img" aria-label="Gráfico do par"></div><p class="note">Arraste uma figura para movê-la (ela fica numa camada própria e não altera preços). Passe o mouse ou toque para ver o nome; clique sem arrastar para abrir os detalhes.</p><div id="detalhe"></div><div id="lista"></div><div id="res"></div>`;
   const run=async()=>{
     S.base=$('#b').value;S.quote=$('#q').value;S.profile=$('#p').value;S.amount=+$('#a').value||10000;save();
-    const res=$('#res');res.textContent='Consultando…';
+    const res=$('#res');res.textContent='Consultando…';$('#ttl').innerHTML=badge(S.base)+badge(S.quote)+'Análise de tendência e vantagem líquida';
     try{
-      const r=await getSeries(S.base,S.quote,S.days);const {ch,ser}=chart($('#chart'),r,S.ind);const a=analyze(r.points,prof(),S.amount);const pats=S.pat?detect(r.points,r.ohlc):[];$('#detalhe').innerHTML='';if(S.pat){overlay($('#chart'),ch,ser,pats,S.fig,k=>showPat(pats.find(p=>p.key===k)));patList(pats)}else $('#lista').innerHTML='';
+      const r=await getSeries(S.base,S.quote,S.days);const {ch,ser}=chart($('#chart'),r,S.ind);const a=analyze(r.points,prof(),S.amount);const det=S.pat||S.sel?detect(r.points,r.ohlc):[];let pats=S.pat?det:[],msg='';
+      if(S.sel){const f=FIGURAS.find(x=>x.nome===S.sel),hit=det.filter(p=>p.nome===S.sel);if(hit.length)pats=[...pats.filter(p=>!hit.includes(p)),...hit.slice(-3)];else if(f&&!f.c)pats=[...pats,template(f,r.points,S.tw)];else msg=`Não encontrei “${S.sel}” neste período${r.ohlc?'':' (esta fonte só tem fechamento diário; candles exigem pares com BRL via PTAX)'}. Tente outro par ou período.`}
+      $('#detalhe').innerHTML=msg?`<p class="warn">${msg}</p>`:'';
+      if(pats.length)overlay($('#chart'),ch,ser,pats,S.fig,k=>showPat(pats.find(p=>p.key===k)));
+      if(pats.length||S.pat)patList(pats);else $('#lista').innerHTML='';
       res.innerHTML=srcNote(r)+(r.ohlc?'':'<p class="note">Esta fonte fornece apenas o fechamento diário; o gráfico é de linha.</p>')+(a.error?`<p class="warn">${a.error}</p>`:`
       <h3>Sinais técnicos</h3><table><tr><th>Indicador</th><th>Valor</th><th>Leitura</th></tr>${a.signals.map(s=>`<tr><td>${s.n}</td><td>${s.txt}</td><td class="${s.v>0?'up':s.v<0?'dn':'mut'}">${s.v>0?'favorece alta':s.v<0?'favorece baixa':'neutro'}</td></tr>`).join('')}</table>
       <h3>Vantagem líquida por horizonte</h3>
@@ -97,8 +102,10 @@ async function viewAnalise(m){
   m.querySelectorAll('select,#a').forEach(e=>e.onchange=run);
   m.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{S.days=+b.dataset.d;m.querySelectorAll('[data-d]').forEach(x=>x.setAttribute('aria-pressed',x===b));run()});
   m.querySelectorAll('[data-i]').forEach(c=>c.onchange=()=>{S.ind[c.dataset.i]=c.checked;run()});
-  m.querySelectorAll('[data-p]').forEach(c=>c.onchange=()=>{S[c.dataset.p]=c.type==='range'?+c.value:c.checked;save();if(c.type!=='range')run()});
-  $('#rst').onclick=()=>{S.fig={};save();run()};run();
+  m.querySelectorAll('[data-p]').forEach(c=>c.onchange=()=>{S[c.dataset.p]=c.type==='range'?+c.value:c.checked;save();if(c.type!=='range'||c.dataset.p==='tw')run()});
+  $('#rst').onclick=()=>{S.fig={};save();run()};
+  if($('#selx'))$('#selx').onclick=()=>{S.sel=null;save();viewAnalise(m)};
+  $('#colar').onclick=async()=>{const o=await colar();if(!o)return;if(o.moeda&&o.moeda!=='BRL'){S.base=o.moeda;S.quote='BRL'}const a=o.total||(o.qtd&&o.cotacao?o.qtd*o.cotacao:0);if(a)S.amount=a;save();viewAnalise(m)};run();
 }
 
 const FIELDS=[['bs','Spread de compra (%)'],['ss','Spread de venda (%)'],['iofB','IOF na compra (%)'],['iofS','IOF na venda (%)'],['fee','Tarifa percentual (%)'],['fixed','Tarifa fixa (moeda de cotação)']];
@@ -128,8 +135,9 @@ async function viewCustos(m){
 
 (async()=>{
   const s=await kvGet('state');if(s)S={...S,...s,profiles:{...PROFILES,...s.profiles}};
-  $('#theme').value=S.theme;theme();
-  $('#theme').onchange=e=>{S.theme=e.target.value;theme();save();render()};
+  S.ind={sma20:false,sma50:false,ema:false,bb:false};S.pat=false;S.sel=null; // o gráfico sempre abre limpo
+  theme();
+  $('#theme').onclick=()=>{S.theme=document.documentElement.dataset.theme==='dark'?'light':'dark';theme();save();render()};
   document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.v));
   matchMedia('(prefers-color-scheme:dark)').addEventListener('change',()=>S.theme==='system'&&theme());
   if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('service-worker.js').catch(()=>{});
@@ -190,9 +198,9 @@ async function viewCarteira(m){
   <label>Tipo<select id="ot"><option>compra</option><option>venda</option></select></label><label>Moeda<select id="om">${cs.map(c=>`<option>${c}</option>`).join('')}</select></label>
   <label>Data<input id="od" type="date" value="${new Date().toISOString().slice(0,10)}"></label><label>Quantidade<input id="oq" type="number" step="any" min="0"></label>
   <label>Total em R$ (compra: pago com taxas; venda: recebido)<input id="oT" type="number" step="any" min="0"></label><label>Taxas e IOF dentro do total (R$)<input id="of" type="number" step="any" min="0" value="0"></label>
-  <label>Instituição<input id="oi"></label><label style="flex-direction:row;gap:6px"><input type="checkbox" id="os">simulação</label><button id="oadd">Registrar</button></div><p id="oprev" class="note"></p></div>
+  <label>Instituição<input id="oi"></label><label style="flex-direction:row;gap:6px"><input type="checkbox" id="os">simulação</label><button id="colar">Colar dados</button><button id="oadd">Registrar</button></div><p id="oprev" class="note"></p></div>
   <h3>Posições (operações reais)</h3><div id="pos">Consultando…</div>
-  <div class="panel"><h3 style="margin-top:0">Projeção de venda</h3><div class="row">
+  <div class="panel"><h3 style="margin-top:0">Projeção de venda <button id="cpy">Copiar resumo</button></h3><div class="row">
   <label>Quantidade comprada<input id="pq" type="number" step="any"></label><label>Total pago em R$ (com taxas)<input id="pT" type="number" step="any"></label><label>Taxas pagas dentro do total (R$)<input id="pf" type="number" step="any" value="0"></label>
   <label>Cotação de venda alvo<input id="px" type="number" step="any"></label><label>Lucro desejado (R$)<input id="pL" type="number" step="any"></label><label>Lucro desejado (%)<input id="pP" type="number" step="any"></label></div>
   <p class="note">Custos de venda do perfil “${sp.nome}”: spread ${sp.ss}%, IOF ${sp.iofS}%, tarifa ${sp.fee}% + ${sp.fixed} fixa (ajuste na aba Custos). Venda com troca para outra moeda: ainda não incluída.</p><div id="pout"></div></div>
@@ -218,10 +226,30 @@ async function viewCarteira(m){
     <p class="note">Valores em reais sobre cotações de referência; spread, IOF e tarifas de venda saem do perfil de custos. Estimativa, não garantia.</p>`;
   };
   m.querySelectorAll('#pq,#pT,#pf,#px,#pL,#pP').forEach(e=>e.oninput=proj);proj();
+  $('#cpy').onclick=()=>navigator.clipboard?.writeText($('#pout').innerText).then(()=>{$('#cpy').textContent='Copiado'}).catch(()=>alert('Não foi possível copiar.'));
+  $('#colar').onclick=async()=>{const o=await colar();if(!o)return;const set=(i,v)=>{if(v!=null&&!Number.isNaN(v))$(i).value=+(+v).toFixed(8)};
+    if(o.tipo)$('#ot').value=o.tipo;if(o.moeda)$('#om').value=o.moeda;if(o.date)$('#od').value=o.date;
+    set('#oq',o.qtd);set('#oT',o.total);set('#of',o.taxas);set('#pq',o.qtd);set('#pT',o.total);set('#pf',o.taxas);prev();proj();
+    if(o.qtdCalculada)alert('A quantidade foi calculada: (total − taxas) ÷ cotação. Confira antes de registrar.')};
   const row=o=>`<tr><td>${o.date}</td><td>${o.tipo}${o.sim?' (simulação)':''}</td><td>${o.moeda}</td><td>${nf(o.qtd,2)}</td><td>${R(o.total)}</td><td>${R(o.taxas)}</td><td>${o.inst||''}</td><td><button data-del="${o.id}">Excluir</button></td></tr>`;
   $('#ops').innerHTML=S.ops.length?`<table><tr><th>Data</th><th>Tipo</th><th>Moeda</th><th>Qtd.</th><th>Total R$</th><th>Taxas R$</th><th>Instituição</th><th></th></tr>${S.ops.slice().sort((a,b)=>a.date<b.date?1:-1).map(row).join('')}</table>`:'<p class="note">Nenhuma operação registrada. Simulações não entram nas posições.</p>';
   m.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{if(confirm('Excluir esta operação?')){S.ops=S.ops.filter(o=>o.id!=b.dataset.del);save();viewCarteira(m)}});
   const px=await Promise.all(pos.map(p=>getSeries(p.moeda,'BRL',10).then(r=>last(r.points).c).catch(()=>null)));
-  $('#pos').innerHTML=pos.length?`<table><tr><th>Moeda</th><th>Saldo</th><th>Preço médio (com taxas)</th><th>Custo total</th><th>Cotação atual</th><th>Líquido se vender (perfil)</th><th>Não realizado</th><th>Realizado</th><th></th></tr>${pos.map((p,j)=>{const v=px[j],liq=v==null?null:p.qtd*v*k-sp.fixed*(p.qtd>0),nr=liq==null||p.qtd<=0?null:liq-p.custo;return`<tr><td>${p.moeda}</td><td>${nf(p.qtd,2)}</td><td>${nf(p.pm,4)}</td><td>${R(p.custo)}</td><td>${v==null?'—':nf(v,4)}</td><td>${liq==null?'—':R(liq)}</td><td class="${cls(nr)}">${nr==null?'—':`${R(nr)} (${pct(nr/p.custo*100)})`}</td><td class="${cls(p.real)}">${R(p.real)}</td><td><button data-fill="${j}">Projetar</button></td></tr>`}).join('')}</table>`:'<p class="note">Sem posições reais ainda.</p>';
+  $('#pos').innerHTML=pos.length?`<table><tr><th>Moeda</th><th>Saldo</th><th>Preço médio (com taxas)</th><th>Custo total</th><th>Cotação atual</th><th>Líquido se vender (perfil)</th><th>Não realizado</th><th>Realizado</th><th></th></tr>${pos.map((p,j)=>{const v=px[j],liq=v==null?null:p.qtd*v*k-sp.fixed*(p.qtd>0),nr=liq==null||p.qtd<=0?null:liq-p.custo;return`<tr><td>${badge(p.moeda)}${p.moeda}</td><td>${nf(p.qtd,2)}</td><td>${nf(p.pm,4)}</td><td>${R(p.custo)}</td><td>${v==null?'—':nf(v,4)}</td><td>${liq==null?'—':R(liq)}</td><td class="${cls(nr)}">${nr==null?'—':`${R(nr)} (${pct(nr/p.custo*100)})`}</td><td class="${cls(p.real)}">${R(p.real)}</td><td><button data-fill="${j}">Projetar</button></td></tr>`}).join('')}</table>`:'<p class="note">Sem posições reais ainda.</p>';
   m.querySelectorAll('[data-fill]').forEach(b=>b.onclick=()=>{const p=pos[b.dataset.fill];if(p.qtd<=0)return;$('#pq').value=+p.qtd.toFixed(8);$('#pT').value=+p.custo.toFixed(2);$('#pf').value=0;$('#pq').scrollIntoView({block:'center'});proj()});
+}
+
+async function colar(){
+  let t='';try{t=await navigator.clipboard.readText()}catch{t=prompt('Cole aqui os dados da operação (compra ou venda):')||''}
+  const o=parseOp(t,Object.keys(CURRENCIES).filter(c=>c!=='BRL'));
+  if(!(o.moeda||o.total||o.qtd)){alert('Não encontrei dados de operação no texto copiado. Inclua moeda, quantidade, total e taxas.');return null}
+  return o;
+}
+function viewFiguras(m){
+  const fams=['Todas',...new Set(FIGURAS.map(f=>f.fam))];
+  m.innerHTML=`<h2>Figuras de análise gráfica</h2><div class="row"><label>Família<select id="ff">${fams.map(f=>`<option>${f}</option>`).join('')}</select></label></div>
+  <p class="note">As figuras clássicas usadas no Forex. “Ver no gráfico” abre a análise e mostra a figura sobre o gráfico: na posição em que foi detectada ou, nos modelos manuais, sobre as últimas barras. Depois ajuste a transparência para comparar com o preço.</p><div class="grid" id="fg"></div>`;
+  const draw=()=>{const v=$('#ff').value;$('#fg').innerHTML=FIGURAS.filter(f=>v==='Todas'||f.fam===v).map(f=>`<div class="panel" style="margin:0">${svg(f)}<b>${f.nome}</b><div class="note">${f.fam} · direção potencial: ${f.dir} · ${f.auto?'detecção automática':'modelo manual'}</div><p style="margin:6px 0;font-size:13px">${f.ctx}</p><button data-f="${f.nome}">Ver no gráfico</button></div>`).join('');
+    m.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{S.sel=b.dataset.f;S.pat=false;go('analise')})};
+  $('#ff').onchange=draw;draw();
 }
