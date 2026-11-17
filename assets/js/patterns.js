@@ -28,6 +28,7 @@ export function detect(P,ohlc=true){
         {p:s*line(end),txt:'Fechamento rompendo a linha de pescoço'},{p:s*hb,txt:`Fechamento além da cabeça (${(s*hb).toFixed(4)})`}));
     }
   }
+  trendPatterns(P,out);
   if(ohlc)for(let i=Math.max(6,P.length-90);i<P.length;i++){ // candles (barra fechada)
     const c=P[i],pv=P[i-1],body=Math.abs(c.c-c.o),rg=c.h-c.l,lo=Math.min(c.o,c.c)-c.l,up=c.h-Math.max(c.o,c.c),dn=c.c<P[i-5].c,upT=c.c>P[i-5].c;
     const add=(n,d,why)=>out.push(mk(n,d,'Identificada',P,i,[{t:c.t,p:d==='alta'?c.l:c.h}],[],null,[why],null,null,true));
@@ -42,4 +43,32 @@ export function detect(P,ohlc=true){
 }
 function mk(nome,dir,estado,P,id,pts,lines,q,crit,conf,inval,single=false){
   return{key:`${nome}|${P[id].t}`,nome,dir,estado,ident:P[id].t,pts,lines:lines.map(l=>({t1:l.t,p1:l.p1,t2:l.t2,p2:l.p2})),q,crit,conf,inval,single};
+}
+
+// Triângulos e canais: linhas pelos pivôs mais recentes (topos e fundos), com desvio máximo de 0,6% e ao menos 5 toques.
+function trendPatterns(P,out){
+  const end=P.length-1,from=end-90,H=pivots(P,1).filter(i=>i>=from),Lw=pivots(P,-1).filter(i=>i>=from);
+  const fit=(idx,f)=>{const a=idx[0],b=idx[idx.length-1],m=(f(b)-f(a))/(b-a);let dev=0;for(const i of idx)dev=Math.max(dev,Math.abs(f(i)-(f(a)+m*(i-a)))/f(i));return dev<=.006?{a,m,y:f(a),dev}:null};
+  for(const [nh,nl] of [[4,4],[4,3],[3,4],[3,3],[4,2],[2,4],[3,2],[2,3]]){
+    if(H.length<nh||Lw.length<nl)continue;
+    const hi=H.slice(-nh),lo=Lw.slice(-nl),uh=fit(hi,i=>P[i].h),ul=fit(lo,i=>P[i].l);if(!uh||!ul)continue;
+    const st=Math.min(hi[0],lo[0]),ie=Math.max(hi[nh-1],lo[nl-1]);if(ie-st<15)continue;
+    const U=i=>uh.y+uh.m*(i-uh.a),Dn=i=>ul.y+ul.m*(i-ul.a),w0=U(st)-Dn(st),w1=U(ie)-Dn(ie);if(!(w0>0&&w1>0))continue;
+    const av=(U(st)+Dn(st)+U(ie)+Dn(ie))/4,dh=uh.m*(ie-st)/av,dl=ul.m*(ie-st)/av,ratio=w1/w0,fl=d=>Math.abs(d)<.015;let c=null;
+    if(ratio<.75){if(fl(dh)&&dl>.015)c=['Triângulo ascendente','alta'];else if(fl(dl)&&dh<-.015)c=['Triângulo descendente','baixa'];else if(dh<-.015&&dl>.015)c=['Triângulo simétrico','neutro']}
+    else if(ratio>.85&&ratio<1.15&&Math.abs(dh-dl)<.012){if(dh>.02)c=['Canal de alta','alta'];else if(dh<-.02)c=['Canal de baixa','baixa'];else if(fl(dh)&&fl(dl))c=['Canal lateral','neutro']}
+    if(!c)continue;
+    const [nome,dir0]=c,tri=nome.startsWith('Tri'),id=ie+K;let ev=null;
+    for(let i=id+1;i<=end&&!ev;i++){if(P[i].c>U(i)*1.002)ev='up';else if(P[i].c<Dn(i)*.998)ev='dn'}
+    let estado=tri?'Confirmação pendente':'Identificada',dir=dir0;
+    if(ev){if(!tri)estado='Invalidada';else if(nome.endsWith('simétrico')){estado='Confirmada';dir=ev==='up'?'alta':'baixa'}else estado=(ev==='up')===(dir0==='alta')?'Confirmada':'Invalidada'}
+    const f4=x=>x.toFixed(4),dev=Math.max(uh.dev,ul.dev),touches=nh+nl;
+    const pts=[...hi.map(i=>({i,p:P[i].h})),...lo.map(i=>({i,p:P[i].l}))].sort((x,y)=>x.i-y.i).map(({i,p})=>({t:P[i].t,p}));
+    out.push(mk(nome,dir,estado,P,id,pts,[{t:P[st].t,p1:U(st),t2:P[end].t,p2:U(end)},{t:P[st].t,p1:Dn(st),t2:P[end].t,p2:Dn(end)}],
+      Math.round(100*(.5*clamp(touches/8)+.5*clamp(1-dev/.006))),
+      [`Toques: ${nh} nos topos e ${nl} nos fundos`,`Desvio máximo das linhas: ${(dev*100).toFixed(2)}% (máx. 0,6%)`,`Duração: ${ie-st} barras`,tri?`Estreitamento: largura final = ${(ratio*100).toFixed(0)}% da inicial`:`Linhas paralelas: largura final = ${(ratio*100).toFixed(0)}% da inicial`],
+      tri?{p:U(end),txt:nome.endsWith('descendente')?`Fechamento abaixo de ${f4(Dn(end))}`:nome.endsWith('ascendente')?`Fechamento acima de ${f4(U(end))}`:`Fechamento acima de ${f4(U(end))} ou abaixo de ${f4(Dn(end))}`}:{p:U(end),txt:`Linha superior em ${f4(U(end))}; inferior em ${f4(Dn(end))}`},
+      tri?{p:Dn(end),txt:nome.endsWith('descendente')?`Fechamento acima de ${f4(U(end))}`:nome.endsWith('ascendente')?`Fechamento abaixo de ${f4(Dn(end))}`:'Rompimento falso, com retorno ao interior do triângulo'}:{p:Dn(end),txt:'Fechamento fora das linhas do canal'}));
+    return;
+  }
 }

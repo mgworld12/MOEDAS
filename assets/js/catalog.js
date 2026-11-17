@@ -5,21 +5,21 @@ const C=(nome,dir,ctx,c,auto=false)=>({nome,fam:'Candles',dir,ctx,c,pts:[],lines
 const OCO=F('Ombro-cabeça-ombro','Reversão','baixa','Após uma alta, três topos com o central mais alto. Fechamento abaixo da linha de pescoço sugere reversão para baixa.',[[0,.2],[.15,.55],[.3,.35],[.5,.85],[.7,.35],[.85,.55],[1,.2]],[[.3,.35,1,.35]],true);
 const TD=F('Topo duplo','Reversão','baixa','Dois topos no mesmo nível após uma alta. Fechamento abaixo do vale entre eles confirma a reversão.',[[0,.2],[.25,.8],[.5,.45],[.75,.8],[1,.2]],[[.25,.45,1,.45]],true);
 const TT=F('Topo triplo','Reversão','baixa','Três topos no mesmo nível: a resistência foi testada três vezes. Rompimento do suporte confirma a reversão.',[[0,.2],[.15,.75],[.3,.45],[.5,.75],[.7,.45],[.85,.75],[1,.2]],[[.3,.45,1,.45]]);
-const TA=F('Triângulo ascendente','Triângulos','alta','Resistência horizontal e fundos cada vez mais altos. Rompimento da resistência costuma indicar alta.',[[0,.3],[.15,.8],[.3,.45],[.45,.8],[.6,.6],[.75,.8],[.88,.72],[1,.95]],[[0,.8,.85,.8],[0,.3,.88,.72]]);
+const TA=F('Triângulo ascendente','Triângulos','alta','Resistência horizontal e fundos cada vez mais altos. Rompimento da resistência costuma indicar alta.',[[0,.3],[.15,.8],[.3,.45],[.45,.8],[.6,.6],[.75,.8],[.88,.72],[1,.95]],[[0,.8,.85,.8],[0,.3,.88,.72]],true);
 const BA=F('Bandeira de alta','Continuidade','alta','Alta forte (mastro) seguida de pequena correção inclinada. Rompimento para cima retoma a alta.',[[0,.1],[.3,.8],[.45,.65],[.55,.72],[.7,.58],[.8,.65],[1,.98]],[[.3,.82,.8,.66],[.3,.62,.8,.46]]);
 const CA=F('Cunha ascendente','Cunhas','baixa','Máximas e mínimas sobem, mas o canal se estreita. O desfecho comum é rompimento para baixo.',[[0,.2],[.15,.5],[.25,.4],[.45,.7],[.55,.6],[.75,.85],[.85,.75],[1,.3]],[[0,.2,.85,.75],[.15,.5,.8,.88]]);
-const CH=F('Canal de alta','Canais e consolidação','alta','Preço sobe entre duas linhas paralelas inclinadas. Atenção ao rompimento da linha inferior.',[[0,.1],[.2,.4],[.3,.3],[.5,.6],[.6,.5],[.8,.8],[.9,.7],[1,.9]],[[0,.05,1,.7],[0,.35,1,1]]);
+const CH=F('Canal de alta','Canais e consolidação','alta','Preço sobe entre duas linhas paralelas inclinadas. Atenção ao rompimento da linha inferior.',[[0,.1],[.2,.4],[.3,.3],[.5,.6],[.6,.5],[.8,.8],[.9,.7],[1,.9]],[[0,.05,1,.7],[0,.35,1,1]],true);
 export const FIGURAS=[
   OCO,M(OCO,'Ombro-cabeça-ombro invertido','alta','Após uma queda, três fundos com o central mais profundo. Fechamento acima da linha de pescoço sugere reversão para alta.',true),
   TD,M(TD,'Fundo duplo','alta','Dois fundos no mesmo nível após uma queda. Fechamento acima do topo entre eles confirma a reversão.',true),
   TT,M(TT,'Fundo triplo','alta','Três fundos no mesmo nível: o suporte foi testado três vezes. Rompimento da resistência confirma a reversão.'),
-  TA,M(TA,'Triângulo descendente','baixa','Suporte horizontal e topos cada vez mais baixos. Rompimento do suporte costuma indicar baixa.'),
-  F('Triângulo simétrico','Triângulos','neutro','Topos descendentes e fundos ascendentes convergem. A direção só fica definida no rompimento.',[[0,.2],[.15,.85],[.3,.3],[.5,.75],[.65,.4],[.8,.65],[1,.9]],[[0,.9,.8,.6],[0,.2,.8,.5]]),
+  TA,M(TA,'Triângulo descendente','baixa','Suporte horizontal e topos cada vez mais baixos. Rompimento do suporte costuma indicar baixa.',true),
+  F('Triângulo simétrico','Triângulos','neutro','Topos descendentes e fundos ascendentes convergem. A direção só fica definida no rompimento.',[[0,.2],[.15,.85],[.3,.3],[.5,.75],[.65,.4],[.8,.65],[1,.9]],[[0,.9,.8,.6],[0,.2,.8,.5]],true),
   BA,M(BA,'Bandeira de baixa','baixa','Queda forte (mastro) seguida de pequena correção inclinada para cima. Rompimento para baixo retoma a queda.'),
   F('Flâmula','Continuidade','neutro','Movimento forte seguido de consolidação em triângulo pequeno. Costuma continuar a tendência anterior.',[[0,.1],[.3,.8],[.45,.6],[.55,.76],[.65,.66],[.75,.72],[1,.98]],[[.3,.8,.78,.7],[.3,.5,.78,.7]]),
   CA,M(CA,'Cunha descendente','alta','Máximas e mínimas caem, mas o canal se estreita. O desfecho comum é rompimento para cima.'),
-  CH,M(CH,'Canal de baixa','baixa','Preço cai entre duas linhas paralelas inclinadas. Atenção ao rompimento da linha superior.'),
-  F('Canal lateral','Canais e consolidação','neutro','Preço oscila entre suporte e resistência horizontais, sem tendência definida.',[[0,.3],[.2,.7],[.4,.3],[.6,.7],[.8,.3],[1,.7]],[[0,.75,1,.75],[0,.25,1,.25]]),
+  CH,M(CH,'Canal de baixa','baixa','Preço cai entre duas linhas paralelas inclinadas. Atenção ao rompimento da linha superior.',true),
+  F('Canal lateral','Canais e consolidação','neutro','Preço oscila entre suporte e resistência horizontais, sem tendência definida.',[[0,.3],[.2,.7],[.4,.3],[.6,.7],[.8,.3],[1,.7]],[[0,.75,1,.75],[0,.25,1,.25]],true),
   F('Retângulo','Canais e consolidação','neutro','Consolidação entre suporte e resistência; costuma terminar em rompimento na direção da tendência anterior.',[[0,.2],[.1,.7],[.3,.3],[.5,.7],[.7,.3],[.85,.7],[1,.95]],[[0,.72,.9,.72],[0,.28,.9,.28]]),
   F('Xícara com alça','Formação especial','alta','Fundo arredondado em U seguido de pequena correção (alça). Rompimento da borda da xícara sugere alta.',[[0,.8],[.1,.6],[.25,.35],[.4,.25],[.55,.3],[.7,.55],[.8,.8],[.87,.68],[.94,.64],[1,.9]],[[0,.8,.8,.8]]),
   C('Martelo','alta','Corpo pequeno no topo e sombra inferior longa após queda: vendedores perderam força.',[[.9,.92,.72,.74],[.75,.77,.58,.6],[.55,.64,.1,.62]],true),

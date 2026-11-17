@@ -7,6 +7,7 @@ import {sma,ema,bollinger} from './indicators.js';
 import {detect} from './patterns.js';
 import {FIGURAS,svg,template} from './catalog.js';
 import {positions,sellProjection,parseOp} from './portfolio.js';
+import {makeBackup,parseBackup,clean,hits} from './backup.js';
 
 const $=(s,r=document)=>r.querySelector(s), last=a=>a[a.length-1];
 const nf=(n,d=4)=>Number.isFinite(n)?n.toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d}):'—';
@@ -14,7 +15,7 @@ const pct=n=>Number.isFinite(n)?(n>0?'+':'')+n.toLocaleString('pt-BR',{maximumFr
 const cls=n=>n>0?'up':n<0?'dn':'';
 const cur=(sel)=>Object.entries(CURRENCIES).map(([k,v])=>`<option value="${k}"${k===sel?' selected':''}>${SYM[k]} ${k} — ${v}</option>`).join('');
 const when=t=>new Date(t).toLocaleString('pt-BR');
-let S={view:'inicio',base:'USD',quote:'BRL',days:180,profile:'especie',amount:10000,theme:'dark',cf:'BRL',ct:'USD',ind:{sma20:false,sma50:false,ema:false,bb:false},ops:[],fig:{},fo:.6,fw:2,figAll:false,pat:false,sel:null,tw:45,profiles:structuredClone(PROFILES)};
+let S={view:'inicio',base:'USD',quote:'BRL',days:180,profile:'especie',amount:10000,theme:'dark',cf:'BRL',ct:'USD',ind:{sma20:false,sma50:false,ema:false,bb:false},ops:[],alerts:[],fig:{},fo:.6,fw:2,figAll:false,pat:false,sel:null,tw:45,profiles:structuredClone(PROFILES)};
 const save=()=>kvSet('state',S);
 const prof=()=>S.profiles[S.profile];
 
@@ -141,7 +142,7 @@ async function viewCustos(m){
   document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.v));
   matchMedia('(prefers-color-scheme:dark)').addEventListener('change',()=>S.theme==='system'&&theme());
   if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('service-worker.js').catch(()=>{});
-  render();
+  render();checkAlerts();setInterval(checkAlerts,3e5);
 })();
 
 function showPat(p){
@@ -201,42 +202,54 @@ async function viewCarteira(m){
   <label>Instituição<input id="oi"></label><label style="flex-direction:row;gap:6px"><input type="checkbox" id="os">simulação</label><button id="colar">Colar dados</button><button id="oadd">Registrar</button></div><p id="oprev" class="note"></p></div>
   <h3>Posições (operações reais)</h3><div id="pos">Consultando…</div>
   <div class="panel"><h3 style="margin-top:0">Projeção de venda <button id="cpy">Copiar resumo</button></h3><div class="row">
-  <label>Quantidade comprada<input id="pq" type="number" step="any"></label><label>Total pago em R$ (com taxas)<input id="pT" type="number" step="any"></label><label>Taxas pagas dentro do total (R$)<input id="pf" type="number" step="any" value="0"></label>
+  <label>Moeda<select id="pm">${cs.map(c=>`<option>${c}</option>`).join('')}</select></label><label>Quantidade comprada<input id="pq" type="number" step="any"></label><label>Total pago em R$ (com taxas)<input id="pT" type="number" step="any"></label><label>Taxas pagas dentro do total (R$)<input id="pf" type="number" step="any" value="0"></label>
   <label>Cotação de venda alvo<input id="px" type="number" step="any"></label><label>Lucro desejado (R$)<input id="pL" type="number" step="any"></label><label>Lucro desejado (%)<input id="pP" type="number" step="any"></label></div>
   <p class="note">Custos de venda do perfil “${sp.nome}”: spread ${sp.ss}%, IOF ${sp.iofS}%, tarifa ${sp.fee}% + ${sp.fixed} fixa (ajuste na aba Custos). Venda com troca para outra moeda: ainda não incluída.</p><div id="pout"></div></div>
-  <h3>Operações registradas</h3><div id="ops"></div>`;
+  <h3>Alertas de preço de venda</h3><div id="al"></div><h3>Operações registradas</h3><div id="ops"></div>
+  <div class="panel"><h3 style="margin-top:0">Backup</h3><p class="note">Seus dados ficam só neste navegador; limpar os dados do navegador apaga tudo. Exporte um arquivo para guardar ou levar a outro aparelho.</p><div class="row"><button id="bex">Exportar backup (JSON)</button><label>Importar backup<input id="bim" type="file" accept=".json,application/json"></label></div></div>`;
   const prev=()=>{const q=num('#oq'),T=num('#oT'),f=num('#of')||0;$('#oprev').innerHTML=q>0&&T>0?`Valor da moeda: <b>${R(T-f)}</b> · taxas: <b>${R(f)}</b> · cotação paga: <b>${nf((T-f)/q,4)}</b> · preço com taxas: <b>${nf(T/q,4)}</b>`:''};
   ['#oq','#oT','#of'].forEach(i=>$(i).oninput=prev);
   $('#oadd').onclick=()=>{
-    const o={id:Date.now(),tipo:$('#ot').value,moeda:$('#om').value,date:$('#od').value,qtd:num('#oq'),total:num('#oT'),taxas:num('#of')||0,inst:$('#oi').value,sim:$('#os').checked};
+    const o={id:Date.now(),tipo:$('#ot').value,moeda:$('#om').value,date:$('#od').value,qtd:num('#oq'),total:num('#oT'),taxas:num('#of')||0,inst:clean($('#oi').value),sim:$('#os').checked};
     if(!(o.qtd>0&&o.total>0&&o.taxas<=o.total&&o.date))return alert('Informe data, quantidade e total válidos (as taxas não podem passar do total).');
     const sd=positions(S.ops).find(p=>p.moeda===o.moeda)?.qtd||0;
     if(o.tipo==='venda'&&!o.sim&&o.qtd>sd+1e-9)return alert(`Saldo insuficiente: você tem ${nf(sd,2)} ${o.moeda} registrados.`);
     S.ops.push(o);save();viewCarteira(m);
   };
+  let resumo='';
+  const addAlert=async(alvo,descr)=>{if(!(alvo>0))return;S.alerts.push({id:Date.now(),moeda:$('#pm').value,alvo:+(+alvo).toFixed(6),descr:clean(descr),ativo:true});save();if('Notification' in window&&Notification.permission==='default')try{await Notification.requestPermission()}catch{}refreshAlerts();checkAlerts()};
   const proj=()=>{
     const i={qtd:num('#pq'),total:num('#pT'),taxas:num('#pf')||0},x=num('#px'),L=num('#pL'),Lp=num('#pP'),out=$('#pout');
-    if(!(i.qtd>0&&i.total>0)){out.innerHTML='<p class="note">Informe quantidade e total pago para projetar.</p>';return}
-    const p=sellProjection(sp,i),row=(a,b)=>`<tr><td>${a}</td><td>${b}</td></tr>`,rs=n=>`<b class="${cls(n)}">${R(n)} (${pct(n/i.total*100)})</b>`;
-    out.innerHTML=`<table>${row('Valor da moeda / taxas pagas',`${R(i.total-i.taxas)} / ${R(i.taxas)}`)}${row('Cotação paga (só a moeda)',nf(p.paid,4))}${row('Preço médio com taxas',nf(p.avg,4))}
-    ${row('Cotação de venda para empatar (já com custos de venda)',`<b>${nf(p.be,4)}</b> (${pct((p.be/p.paid-1)*100)} sobre a cotação paga)`)}
-    ${x>0?row(`Resultado vendendo tudo a ${nf(x,4)}`,rs(p.result(x))):''}
-    ${L>0?row(`Cotação para lucrar ${R(L)}`,`<b>${nf(p.priceFor(L),4)}</b>`):''}${Lp>0?row(`Cotação para lucrar ${Lp}%`,`<b>${nf(p.priceFor(i.total*Lp/100),4)}</b>`):''}
-    ${x>0&&L>0?row(`Quantidade a vender a ${nf(x,4)} para realizar ${R(L)}`,(n=>n==null?'<span class="warn">Este preço não cobre o custo médio</span>':n>i.qtd?`<span class="warn">Precisa de ${nf(n,2)}, mais que os ${nf(i.qtd,2)} comprados</span>`:`<b>${nf(n,4)}</b> (recebe ${R(n*x*p.k-sp.fixed)})`)(p.unitsFor(x,L))):''}</table>
-    <p class="note">Valores em reais sobre cotações de referência; spread, IOF e tarifas de venda saem do perfil de custos. Estimativa, não garantia.</p>`;
+    if(!(i.qtd>0&&i.total>0)){out.innerHTML='<p class="note">Informe quantidade e total pago para projetar.</p>';resumo='';return}
+    const p=sellProjection(sp,i),rows=[],add=(a,h,ap,ad)=>rows.push({a,h,ap,ad}),rs=n=>`<b class="${cls(n)}">${R(n)} (${pct(n/i.total*100)})</b>`;
+    add('Valor da moeda / taxas pagas',`${R(i.total-i.taxas)} / ${R(i.taxas)}`);add('Cotação paga (só a moeda)',nf(p.paid,4));add('Preço médio com taxas',nf(p.avg,4));
+    add('Cotação de venda para empatar (com custos de venda)',`<b>${nf(p.be,4)}</b> (${pct((p.be/p.paid-1)*100)} sobre a cotação paga)`,p.be,'empate');
+    if(x>0)add(`Resultado vendendo tudo a ${nf(x,4)}`,rs(p.result(x)),x,'preço alvo');
+    if(L>0)add(`Cotação para lucrar ${R(L)}`,`<b>${nf(p.priceFor(L),4)}</b>`,p.priceFor(L),`lucro de R$ ${R(L)}`);
+    if(Lp>0)add(`Cotação para lucrar ${Lp}%`,`<b>${nf(p.priceFor(i.total*Lp/100),4)}</b>`,p.priceFor(i.total*Lp/100),`lucro de ${Lp}%`);
+    if(x>0&&L>0)add(`Quantidade a vender a ${nf(x,4)} para realizar ${R(L)}`,(n=>n==null?'<span class="warn">Este preço não cobre o custo médio</span>':n>i.qtd?`<span class="warn">Precisa de ${nf(n,2)}, mais que os ${nf(i.qtd,2)} comprados</span>`:`<b>${nf(n,4)}</b> (recebe ${R(n*x*p.k-sp.fixed)})`)(p.unitsFor(x,L)));
+    out.innerHTML=`<table>${rows.map(r=>`<tr><td>${r.a}</td><td>${r.h}${r.ap?` <button data-al="${r.ap}" data-d="${r.ad}">Alertar</button>`:''}</td></tr>`).join('')}</table><p class="note">Valores em reais sobre cotações de referência; spread, IOF e tarifas de venda saem do perfil de custos. “Alertar” avisa quando a cotação de referência chegar a esse preço. Estimativa, não garantia.</p>`;
+    resumo=`Projeção de venda — ${$('#pm').value}\n`+rows.map(r=>`${r.a}: ${r.h.replace(/<[^>]+>/g,'')}`).join('\n');
+    out.querySelectorAll('[data-al]').forEach(b=>b.onclick=()=>addAlert(+b.dataset.al,b.dataset.d));
   };
   m.querySelectorAll('#pq,#pT,#pf,#px,#pL,#pP').forEach(e=>e.oninput=proj);proj();
-  $('#cpy').onclick=()=>navigator.clipboard?.writeText($('#pout').innerText).then(()=>{$('#cpy').textContent='Copiado'}).catch(()=>alert('Não foi possível copiar.'));
+  $('#cpy').onclick=()=>navigator.clipboard?.writeText(resumo).then(()=>{$('#cpy').textContent='Copiado'}).catch(()=>alert('Não foi possível copiar.'));
   $('#colar').onclick=async()=>{const o=await colar();if(!o)return;const set=(i,v)=>{if(v!=null&&!Number.isNaN(v))$(i).value=+(+v).toFixed(8)};
     if(o.tipo)$('#ot').value=o.tipo;if(o.moeda)$('#om').value=o.moeda;if(o.date)$('#od').value=o.date;
-    set('#oq',o.qtd);set('#oT',o.total);set('#of',o.taxas);set('#pq',o.qtd);set('#pT',o.total);set('#pf',o.taxas);prev();proj();
+    if(o.moeda)$('#pm').value=o.moeda;set('#oq',o.qtd);set('#oT',o.total);set('#of',o.taxas);set('#pq',o.qtd);set('#pT',o.total);set('#pf',o.taxas);prev();proj();
     if(o.qtdCalculada)alert('A quantidade foi calculada: (total − taxas) ÷ cotação. Confira antes de registrar.')};
-  const row=o=>`<tr><td>${o.date}</td><td>${o.tipo}${o.sim?' (simulação)':''}</td><td>${o.moeda}</td><td>${nf(o.qtd,2)}</td><td>${R(o.total)}</td><td>${R(o.taxas)}</td><td>${o.inst||''}</td><td><button data-del="${o.id}">Excluir</button></td></tr>`;
+  const row=o=>`<tr><td>${o.date}</td><td>${o.tipo}${o.sim?' (simulação)':''}</td><td>${o.moeda}</td><td>${nf(o.qtd,2)}</td><td>${R(o.total)}</td><td>${R(o.taxas)}</td><td>${clean(o.inst)}</td><td><button data-del="${o.id}">Excluir</button></td></tr>`;
   $('#ops').innerHTML=S.ops.length?`<table><tr><th>Data</th><th>Tipo</th><th>Moeda</th><th>Qtd.</th><th>Total R$</th><th>Taxas R$</th><th>Instituição</th><th></th></tr>${S.ops.slice().sort((a,b)=>a.date<b.date?1:-1).map(row).join('')}</table>`:'<p class="note">Nenhuma operação registrada. Simulações não entram nas posições.</p>';
   m.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{if(confirm('Excluir esta operação?')){S.ops=S.ops.filter(o=>o.id!=b.dataset.del);save();viewCarteira(m)}});
+  refreshAlerts=()=>{const A=S.alerts;if($('#al'))$('#al').innerHTML=A.length?`<table><tr><th>Moeda</th><th>Avisar quando chegar a</th><th>Motivo</th><th>Estado</th><th></th></tr>${A.map(a=>`<tr><td>${badge(a.moeda)}${a.moeda}</td><td>${nf(a.alvo,4)}</td><td>${clean(a.descr)}</td><td>${a.ativo?'Ativo':a.disparado?`Disparado em ${new Date(a.disparado).toLocaleString('pt-BR')} (${nf(a.preco,4)})`:'Inativo'}</td><td><button data-ad="${a.id}">Excluir</button></td></tr>`).join('')}</table><p class="note">O app confere a cada 5 minutos enquanto estiver aberto, com a cotação de referência do Banco Central. Com o app fechado não há aviso.</p>`:'<p class="note">Nenhum alerta. Use “Alertar” na projeção de venda.</p>';m.querySelectorAll('[data-ad]').forEach(b=>b.onclick=()=>{S.alerts=S.alerts.filter(a=>a.id!=b.dataset.ad);save();refreshAlerts()})};
+  refreshAlerts();
+  $('#bex').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([makeBackup(S)],{type:'application/json'}));a.download=`moedas-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1e3)};
+  $('#bim').onchange=async e=>{const f=e.target.files[0];if(!f)return;if(f.size>5e6)return alert('Arquivo grande demais para um backup.');const r=parseBackup(await f.text());if(r.erro)return alert(r.erro);
+    if(!confirm(`Substituir os dados atuais por ${r.dados.ops.length} operações e ${r.dados.alerts.length} alertas do arquivo?`))return;
+    Object.assign(S,r.dados,{profiles:{...S.profiles,...(r.dados.profiles||{})}});if(!S.profiles[S.profile])S.profile='especie';theme();save();viewCarteira(m)};
   const px=await Promise.all(pos.map(p=>getSeries(p.moeda,'BRL',10).then(r=>last(r.points).c).catch(()=>null)));
   $('#pos').innerHTML=pos.length?`<table><tr><th>Moeda</th><th>Saldo</th><th>Preço médio (com taxas)</th><th>Custo total</th><th>Cotação atual</th><th>Líquido se vender (perfil)</th><th>Não realizado</th><th>Realizado</th><th></th></tr>${pos.map((p,j)=>{const v=px[j],liq=v==null?null:p.qtd*v*k-sp.fixed*(p.qtd>0),nr=liq==null||p.qtd<=0?null:liq-p.custo;return`<tr><td>${badge(p.moeda)}${p.moeda}</td><td>${nf(p.qtd,2)}</td><td>${nf(p.pm,4)}</td><td>${R(p.custo)}</td><td>${v==null?'—':nf(v,4)}</td><td>${liq==null?'—':R(liq)}</td><td class="${cls(nr)}">${nr==null?'—':`${R(nr)} (${pct(nr/p.custo*100)})`}</td><td class="${cls(p.real)}">${R(p.real)}</td><td><button data-fill="${j}">Projetar</button></td></tr>`}).join('')}</table>`:'<p class="note">Sem posições reais ainda.</p>';
-  m.querySelectorAll('[data-fill]').forEach(b=>b.onclick=()=>{const p=pos[b.dataset.fill];if(p.qtd<=0)return;$('#pq').value=+p.qtd.toFixed(8);$('#pT').value=+p.custo.toFixed(2);$('#pf').value=0;$('#pq').scrollIntoView({block:'center'});proj()});
+  m.querySelectorAll('[data-fill]').forEach(b=>b.onclick=()=>{const p=pos[b.dataset.fill];if(p.qtd<=0)return;$('#pm').value=p.moeda;$('#pq').value=+p.qtd.toFixed(8);$('#pT').value=+p.custo.toFixed(2);$('#pf').value=0;$('#pq').scrollIntoView({block:'center'});proj()});
 }
 
 async function colar(){
@@ -252,4 +265,19 @@ function viewFiguras(m){
   const draw=()=>{const v=$('#ff').value;$('#fg').innerHTML=FIGURAS.filter(f=>v==='Todas'||f.fam===v).map(f=>`<div class="panel" style="margin:0">${svg(f)}<b>${f.nome}</b><div class="note">${f.fam} · direção potencial: ${f.dir} · ${f.auto?'detecção automática':'modelo manual'}</div><p style="margin:6px 0;font-size:13px">${f.ctx}</p><button data-f="${f.nome}">Ver no gráfico</button></div>`).join('');
     m.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{S.sel=b.dataset.f;S.pat=false;go('analise')})};
   $('#ff').onchange=draw;draw();
+}
+
+let refreshAlerts=()=>{};
+function notify(msg){
+  let t=$('#toast');if(!t){t=document.createElement('div');t.id='toast';t.setAttribute('role','alert');document.body.append(t)}
+  const r=document.createElement('div'),sp=document.createElement('span'),b=document.createElement('button');sp.textContent=msg;b.textContent='Fechar';b.onclick=()=>r.remove();r.append(sp,b);t.append(r);
+  if('Notification' in window&&Notification.permission==='granted'){const f=()=>new Notification('Investimento em Moedas',{body:msg});try{navigator.serviceWorker?.ready.then(g=>g.showNotification('Investimento em Moedas',{body:msg})).catch(f)}catch{f()}}
+}
+async function checkAlerts(){
+  const act=S.alerts.filter(a=>a.ativo);if(!act.length)return;
+  for(const mo of new Set(act.map(a=>a.moeda))){
+    let px;try{px=last((await getSeries(mo,'BRL',10)).points).c}catch{continue}
+    for(const a of hits(S.alerts,mo,px)){a.ativo=false;a.disparado=Date.now();a.preco=px;notify(`${a.moeda} chegou a ${nf(px,4)} (alvo ${nf(a.alvo,4)}, ${a.descr}).`)}
+  }
+  save();if(S.view==='carteira')refreshAlerts();
 }
