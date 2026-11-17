@@ -1,5 +1,5 @@
-const V='moedas-v2';
-const SHELL=['./','index.html','manifest.json','assets/css/style.css','assets/icons/icon.svg',...['app','config','storage','sources','indicators','costs','analysis','patterns','portfolio'].map(n=>`assets/js/${n}.js`)];
+const V='moedas-v3';
+const SHELL=['./','index.html','manifest.json','assets/css/style.css','assets/icons/icon.svg',...['app','config','storage','sources','indicators','costs','analysis','patterns','portfolio','catalog'].map(n=>`assets/js/${n}.js`)];
 self.addEventListener('install',e=>e.waitUntil(caches.open(V).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==V).map(x=>caches.delete(x)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>{

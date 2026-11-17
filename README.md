@@ -9,6 +9,7 @@ PWA estático (HTML/CSS/JS, módulos ES) para analisar tendências de pares de m
 - **Custos:** perfis configuráveis (espécie, remessa, cartão, personalizado), ponto de equilíbrio de ida e volta, cenários de saída e comparação entre perfis.
 - **Padrões gráficos:** topo/fundo duplo, ombro-cabeça-ombro (e invertido), doji, martelo, estrela cadente e engolfos, com estados, critérios, qualidade e identificação sem olhar o futuro. As figuras ficam numa camada própria: arraste, ajuste transparência e espessura, oculte uma a uma ou todas, e restaure as posições.
 - **Carteira:** operações reais e simuladas (separadas), preço médio com taxas, lucro realizado e não realizado, e **projeção de venda** (empate, resultado num preço alvo, preço para o lucro desejado e quantidade a vender).
+- **Figuras:** página com 24 figuras do Forex (esquema, contexto e direção); “Ver no gráfico” as mostra sobre o gráfico. **Colar dados** preenche carteira e análise a partir de texto copiado. O gráfico abre sempre limpo.
 - Tema escuro/claro/sistema, dados em IndexedDB, cache e aviso de dado desatualizado, instalável como PWA.
 
 ## Fontes
